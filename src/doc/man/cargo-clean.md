@@ -47,8 +47,6 @@ Remove all artifacts in the `release` directory.
 Remove all artifacts in the directory with the given profile name.
 {{/option}}
 
-{{> options-target-dir }}
-
 {{> options-target-triple }}
 
 {{/options}}
