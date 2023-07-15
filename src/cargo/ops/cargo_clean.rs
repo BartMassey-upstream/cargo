@@ -315,7 +315,7 @@ fn rm_rf(path: &Path, config: &Config, progress: &mut dyn CleaningProgressBar) -
 // Check for the existence of a valid `CACHEDIR.TAG` in the target directory,
 // since otherwise we may be about to remove somebody's valuable stuff. See
 // https://bford.info/cachedir/
-fn check_target_dir(path: &Path) -> CargoResult<()> {
+fn check_target_tag(path: &Path) -> CargoResult<()> {
     let mut path = PathBuf::from(path);
     path.push("CACHEDIR.TAG");
     let tag_file = fs::File::open(&path).map_err(|e| {
@@ -335,7 +335,13 @@ fn check_target_dir(path: &Path) -> CargoResult<()> {
 }
 
 fn clean_entire_folder(path: &Path, config: &Config) -> CargoResult<()> {
-    check_target_dir(path)?;
+    if !path.is_dir() {
+        if path.exists() {
+            return Err(anyhow::anyhow!("clean target exists but is not a directory"));
+        }
+        return Ok(());
+    }
+    check_target_tag(path)?;
     let num_paths = walkdir::WalkDir::new(path).into_iter().count();
     let mut progress = CleaningFolderBar::new(config, num_paths);
     rm_rf(path, config, &mut progress)
