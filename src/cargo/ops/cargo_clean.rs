@@ -5,13 +5,13 @@ use crate::ops;
 use crate::util::edit_distance;
 use crate::util::errors::CargoResult;
 use crate::util::interning::InternedString;
+use crate::util::target_dir;
 use crate::util::{Config, Progress, ProgressStyle};
 
 use anyhow::Context as _;
 use cargo_util::paths;
 use std::fs;
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub struct CleanOptions<'a> {
     pub config: &'a Config,
@@ -312,28 +312,6 @@ fn rm_rf(path: &Path, config: &Config, progress: &mut dyn CleaningProgressBar) -
     Ok(())
 }
 
-// Check for the existence of a valid `CACHEDIR.TAG` in the target directory,
-// since otherwise we may be about to remove somebody's valuable stuff. See
-// https://bford.info/cachedir/
-fn check_target_tag(path: &Path) -> CargoResult<()> {
-    let mut path = PathBuf::from(path);
-    path.push("CACHEDIR.TAG");
-    let tag_file = fs::File::open(&path).map_err(|e| {
-        anyhow::anyhow!("could not find cache tag in target directory: {}", e)
-    })?;
-    let tag_file = BufReader::new(tag_file);
-    let tag_line = tag_file
-        .lines()
-        .next()
-        .ok_or(anyhow::anyhow!("invalid (empty) CACHEDIR.TAG in target directory"))?
-        .map_err(|_| anyhow::anyhow!("could not read CACHEDIR.TAG in target directory"))?;
-    const TAG: &str = "Signature: 8a477f597d28d172789f06886806bc55";
-    if tag_line != TAG {
-        return Err(anyhow::anyhow!("invalid CACHEDIR.TAG in target directory"))
-    }
-    Ok(())
-}
-
 fn clean_entire_folder(path: &Path, config: &Config) -> CargoResult<()> {
     if !path.is_dir() {
         if path.exists() {
@@ -341,7 +319,7 @@ fn clean_entire_folder(path: &Path, config: &Config) -> CargoResult<()> {
         }
         return Ok(());
     }
-    check_target_tag(path)?;
+    target_dir::check_target_tag(path)?;
     let num_paths = walkdir::WalkDir::new(path).into_iter().count();
     let mut progress = CleaningFolderBar::new(config, num_paths);
     rm_rf(path, config, &mut progress)
